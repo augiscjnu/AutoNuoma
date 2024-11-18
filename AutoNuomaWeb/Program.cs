@@ -4,33 +4,37 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using AutoNuoma.Core.Contracts;
 using AutoNuoma.Core.Repo;
+using Serilog;
+using AutoNuoma.Core.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 
-// Automobiliai repo
 builder.Services.AddTransient<IAutomobilisRepository>(x => new AutomobilisRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
-// Klientai repo
 builder.Services.AddTransient<IKlientasRepository>(x => new KlientasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
-// Nuomos uþsakymai repo
 
 builder.Services.AddTransient<IDarbuotojasRepository>(x => new DarbuotojasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
 builder.Services.AddTransient<INuomosUzsakymasRepository>(x => new NuomosUzsakymasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
-// Pridedame MVC arba API paslaugas
+builder.Services.AddTransient<DataBackupService>();
+
+builder.Services.AddSingleton<IRecieptRepository>(provider => new RecieptRepository("C:\\path\\to\\receipts", provider.GetRequiredService<IAutomobilisRepository>()));
+builder.Services.AddSingleton<RentalService>();
+
 builder.Services.AddControllers();
 
-// Swagger/OpenAPI konfigûracija
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Konfigûruojame HTTP uþklausø apdorojimo sekà
+
+
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -39,6 +43,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
-app.MapControllers(); // Marðrutø registracija
+app.MapControllers(); 
+
+var log = new LoggerConfiguration().MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File("logs/AutoNuoma.txt", rollingInterval: RollingInterval.Day).CreateLogger();
+Log.Logger = log;
 
 app.Run();
