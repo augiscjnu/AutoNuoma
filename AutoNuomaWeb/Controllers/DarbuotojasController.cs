@@ -1,138 +1,172 @@
-﻿using AutoNuoma.Core.Contracts;
-using AutoNuoma.Core.Models;
+﻿using AutoNuoma.Core.Models;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
+using Microsoft.Extensions.Logging; // Add this namespace
+using MongoDB.Bson;
+using MongoDB.Driver;
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace AutoNuoma.Controllers
+namespace AutoNuoma.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class DarbuotojasController : ControllerBase
     {
-        private readonly IDarbuotojasRepository _darbuotojasRepository;
+        private readonly IMongoCollection<Darbuotojas> _darbuotojaiCollection;
+        private readonly ILogger<DarbuotojasController> _logger;  // Declare logger
 
-        public DarbuotojasController(IDarbuotojasRepository darbuotojasRepository)
+        // Inject ILogger and MongoDB client into the constructor
+        public DarbuotojasController(IMongoClient mongoClient, ILogger<DarbuotojasController> logger)
         {
-            _darbuotojasRepository = darbuotojasRepository;
+            // MongoDB collection setup
+            var database = mongoClient.GetDatabase("AutoNuomaDb");
+            _darbuotojaiCollection = database.GetCollection<Darbuotojas>("Darbuotojai");
+
+            // Assign the logger
+            _logger = logger;
         }
 
-        // Gauti visus darbuotojus
+        // GET: api/Darbuotojas
         [HttpGet]
-        public IActionResult GetDarbuotojai()
+        public async Task<ActionResult<List<Darbuotojas>>> Get()
         {
-            Log.Information("Fetching all darbuotojai.");
             try
             {
-                var darbuotojai = _darbuotojasRepository.GetAllDarbuotojai();
-                if (darbuotojai == null || darbuotojai.Count == 0)
-                {
-                    Log.Warning("No darbuotojai found.");
-                    return NotFound("Darbuotojai nerasti.");
-                }
-                Log.Information("{Count} darbuotojai fetched successfully.", darbuotojai.Count);
+                _logger.LogInformation("Fetching all darbuotojai from the database.");
+
+                var darbuotojai = await _darbuotojaiCollection.Find(_ => true).ToListAsync();
+
+                _logger.LogInformation($"Successfully fetched {darbuotojai.Count} darbuotojai.");
                 return Ok(darbuotojai);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error fetching darbuotojai.");
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while fetching darbuotojai: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Gauti darbuotoją pagal ID
-        [HttpGet("{id}")]
-        public IActionResult GetDarbuotojas(int id)
+        // GET: api/Darbuotojas/name/{Vardas}
+        [HttpGet("name/{Vardas}")]
+        public async Task<ActionResult<Darbuotojas>> GetByName(string Vardas)
         {
-            Log.Information("Fetching darbuotojas with ID {Id}.", id);
             try
             {
-                var darbuotojas = _darbuotojasRepository.GetDarbuotojasById(id);
+                _logger.LogInformation($"Searching for darbuotojas with name: {Vardas}");
+
+                var darbuotojas = await _darbuotojaiCollection
+                    .Find(d => d.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase)) // Case-insensitive search
+                    .FirstOrDefaultAsync();
+
                 if (darbuotojas == null)
                 {
-                    Log.Warning("Darbuotojas with ID {Id} not found.", id);
-                    return NotFound($"Darbuotojas su ID {id} nerastas.");
+                    _logger.LogWarning($"Darbuotojas with name '{Vardas}' not found.");
+                    return NotFound($"Darbuotojas with name '{Vardas}' not found.");
                 }
-                Log.Information("Darbuotojas with ID {Id} fetched successfully.", id);
+
+                _logger.LogInformation($"Darbuotojas with name '{Vardas}' found.");
                 return Ok(darbuotojas);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error fetching darbuotojas with ID {Id}.", id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while searching for darbuotojas by name '{Vardas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Pridėti naują darbuotoją
+        // POST: api/Darbuotojas
         [HttpPost]
-        public IActionResult AddDarbuotojas([FromBody] Darbuotojas darbuotojas)
+        public async Task<ActionResult<Darbuotojas>> Post([FromBody] Darbuotojas darbuotojas)
         {
-            Log.Information("Attempting to add a new darbuotojas with ID {Id}.", darbuotojas?.Id);
+            if (string.IsNullOrWhiteSpace(darbuotojas.Vardas) || string.IsNullOrWhiteSpace(darbuotojas.Pavarde))
+            {
+                return BadRequest("Darbuotojas must have both a first name (Vardas) and last name (Pavarde).");
+            }
+
             try
             {
-                if (darbuotojas == null)
-                {
-                    Log.Warning("Invalid darbuotojas data.");
-                    return BadRequest("Darbuotojo duomenys neteisingi.");
-                }
+                _logger.LogInformation("Inserting a new darbuotojas into the database.");
 
-                _darbuotojasRepository.AddDarbuotojas(darbuotojas);
-                Log.Information("Darbuotojas with ID {Id} added successfully.", darbuotojas.Id);
-                return CreatedAtAction(nameof(GetDarbuotojas), new { id = darbuotojas.Id }, darbuotojas);
+                await _darbuotojaiCollection.InsertOneAsync(darbuotojas);
+
+                _logger.LogInformation($"Successfully inserted darbuotojas with name: {darbuotojas.Vardas} {darbuotojas.Pavarde}");
+
+                return CreatedAtAction(nameof(GetByName), new { Vardas = darbuotojas.Vardas }, darbuotojas);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error adding darbuotojas with ID {Id}.", darbuotojas?.Id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while inserting darbuotojas: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Atnaujinti darbuotoją
-        [HttpPut("{id}")]
-        public IActionResult UpdateDarbuotojas(int id, [FromBody] Darbuotojas darbuotojas)
+        // PUT: api/Darbuotojas/name/{Vardas}
+        [HttpPut("name/{Vardas}")]
+        public async Task<IActionResult> Put(string Vardas, [FromBody] Darbuotojas darbuotojas)
         {
-            Log.Information("Attempting to update darbuotojas with ID {Id}.", id);
+            if (darbuotojas == null || string.IsNullOrWhiteSpace(darbuotojas.Vardas) || string.IsNullOrWhiteSpace(darbuotojas.Pavarde))
+            {
+                return BadRequest("Darbuotojas must have both a first name (Vardas) and last name (Pavarde).");
+            }
+
             try
             {
-                if (darbuotojas == null || darbuotojas.Id != id)
+                _logger.LogInformation($"Updating darbuotojas with name: {Vardas}");
+
+                var existingDarbuotojas = await _darbuotojaiCollection
+                    .Find(d => d.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
+                if (existingDarbuotojas == null)
                 {
-                    Log.Warning("Invalid darbuotojas data or mismatched ID. Provided ID: {ProvidedId}, expected ID: {Id}.", darbuotojas?.Id, id);
-                    return BadRequest("Netinkami darbuotojo duomenys.");
+                    _logger.LogWarning($"Darbuotojas with name '{Vardas}' not found.");
+                    return NotFound($"Darbuotojas with name '{Vardas}' not found.");
                 }
 
-                _darbuotojasRepository.UpdateDarbuotojas(darbuotojas);
-                Log.Information("Darbuotojas with ID {Id} updated successfully.", id);
+                darbuotojas.Vardas = Vardas;  // Ensure the first name stays the same
+
+                await _darbuotojaiCollection.ReplaceOneAsync(d => d.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase), darbuotojas);
+
+                _logger.LogInformation($"Successfully updated darbuotojas with name: {Vardas}");
+
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error updating darbuotojas with ID {Id}.", id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while updating darbuotojas with name '{Vardas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Ištrinti darbuotoją pagal ID
-        [HttpDelete("{id}")]
-        public IActionResult DeleteDarbuotojas(int id)
+        // DELETE: api/Darbuotojas/name/{Vardas}
+        [HttpDelete("name/{Vardas}")]
+        public async Task<IActionResult> Delete(string Vardas)
         {
-            Log.Information("Attempting to delete darbuotojas with ID {Id}.", id);
             try
             {
-                var darbuotojas = _darbuotojasRepository.GetDarbuotojasById(id);
+                _logger.LogInformation($"Deleting darbuotojas with name: {Vardas}");
+
+                var darbuotojas = await _darbuotojaiCollection
+                    .Find(d => d.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
                 if (darbuotojas == null)
                 {
-                    Log.Warning("Darbuotojas with ID {Id} not found.", id);
-                    return NotFound($"Darbuotojas su ID {id} nerastas.");
+                    _logger.LogWarning($"Darbuotojas with name '{Vardas}' not found.");
+                    return NotFound($"Darbuotojas with name '{Vardas}' not found.");
                 }
 
-                _darbuotojasRepository.RemoveDarbuotojasById(id);
-                Log.Information("Darbuotojas with ID {Id} deleted successfully.", id);
+                await _darbuotojaiCollection.DeleteOneAsync(d => d.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase));
+
+                _logger.LogInformation($"Successfully deleted darbuotojas with name: {Vardas}");
+
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error deleting darbuotojas with ID {Id}.", id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while deleting darbuotojas with name '{Vardas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
     }

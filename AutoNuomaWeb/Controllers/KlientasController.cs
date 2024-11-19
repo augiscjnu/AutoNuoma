@@ -1,116 +1,157 @@
-﻿using AutoNuoma.Core.Contracts;
-using AutoNuoma.Core.Models;
+﻿using AutoNuoma.Core.Models;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
+using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace AutoNuoma.Controllers
+namespace AutoNuoma.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class KlientasController : ControllerBase
     {
-        private readonly IKlientasRepository _klientasRepository;
+        private readonly IMongoCollection<Klientas> _klientaiCollection;
+        private readonly ILogger<KlientasController> _logger;
 
-        // Konstruktorinė priklausomybė nuo IKlientasRepository
-        public KlientasController(IKlientasRepository klientasRepository)
+        // Constructor with dependency injection of MongoClient and Logger
+        public KlientasController(IMongoClient mongoClient, ILogger<KlientasController> logger)
         {
-            _klientasRepository = klientasRepository;
+            var database = mongoClient.GetDatabase("AutoNuomaDb");
+            _klientaiCollection = database.GetCollection<Klientas>("Klientai");
+            _logger = logger;
         }
 
-        // Gauti visus klientus
+        // GET: api/Klientas
         [HttpGet]
-        public IActionResult GetKlientai()
+        public async Task<ActionResult<List<Klientas>>> Get()
         {
-            Log.Information("Fetching all klientai.");
             try
             {
-                var klientai = _klientasRepository.GetAllKlientai();
-                if (klientai == null || klientai.Count == 0)
-                {
-                    Log.Warning("No klientai found.");
-                    return NotFound("Klientai nerasti.");
-                }
-                Log.Information("{Count} klientai fetched successfully.", klientai.Count);
+                _logger.LogInformation("Fetching all klientai from the database.");
+                var klientai = await _klientaiCollection.Find(_ => true).ToListAsync();
                 return Ok(klientai);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error fetching klientai.");
-                return StatusCode(500, $"Klaida: {ex.Message}");
+                _logger.LogError($"Error occurred while fetching klientai: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Gauti klientą pagal ID
-        [HttpGet("{id}")]
-        public IActionResult GetKlientas(int id)
+        // GET: api/Klientas/name/{Vardas}
+        [HttpGet("name/{Vardas}")]
+        public async Task<ActionResult<Klientas>> GetByName(string Vardas)
         {
-            Log.Information("Fetching klientas with ID {Id}.", id);
             try
             {
-                var klientas = _klientasRepository.GetKlientasById(id);
+                _logger.LogInformation($"Searching for klientas with name: {Vardas}");
+                var klientas = await _klientaiCollection
+                    .Find(k => k.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
                 if (klientas == null)
                 {
-                    Log.Warning("Klientas with ID {Id} not found.", id);
-                    return NotFound($"Klientas su ID {id} nerastas.");
+                    _logger.LogWarning($"Klientas with name '{Vardas}' not found.");
+                    return NotFound($"Klientas with name '{Vardas}' not found.");
                 }
-                Log.Information("Klientas with ID {Id} fetched successfully.", id);
+
+                _logger.LogInformation($"Klientas with name '{Vardas}' found.");
                 return Ok(klientas);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error fetching klientas with ID {Id}.", id);
-                return StatusCode(500, $"Klaida: {ex.Message}");
+                _logger.LogError($"Error occurred while searching for klientas by name '{Vardas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Pridėti naują klientą
+        // POST: api/Klientas
         [HttpPost]
-        public IActionResult AddKlientas([FromBody] Klientas klientas)
+        public async Task<ActionResult<Klientas>> Post([FromBody] Klientas klientas)
         {
-            Log.Information("Attempting to add a new klientas with ID {Id}.", klientas?.Id);
+            if (string.IsNullOrWhiteSpace(klientas.Vardas) || string.IsNullOrWhiteSpace(klientas.Pavarde))
+            {
+                return BadRequest("Klientas must have both a first name (Vardas) and last name (Pavarde).");
+            }
+
             try
             {
-                if (klientas == null)
-                {
-                    Log.Warning("Invalid klientas data.");
-                    return BadRequest("Kliento duomenys yra neteisingi.");
-                }
-
-                _klientasRepository.AddKlientas(klientas);
-                Log.Information("Klientas with ID {Id} added successfully.", klientas.Id);
-                return CreatedAtAction(nameof(GetKlientas), new { id = klientas.Id }, klientas);
+                _logger.LogInformation($"Inserting a new klientas with name: {klientas.Vardas} {klientas.Pavarde}");
+                await _klientaiCollection.InsertOneAsync(klientas);
+                return CreatedAtAction(nameof(GetByName), new { Vardas = klientas.Vardas }, klientas);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error adding klientas with ID {Id}.", klientas?.Id);
-                return StatusCode(500, $"Klaida: {ex.Message}");
+                _logger.LogError($"Error occurred while inserting klientas: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // Ištrinti klientą pagal ID
-        [HttpDelete("{id}")]
-        public IActionResult DeleteKlientas(int id)
+        // PUT: api/Klientas/name/{Vardas}
+        [HttpPut("name/{Vardas}")]
+        public async Task<IActionResult> Put(string Vardas, [FromBody] Klientas klientas)
         {
-            Log.Information("Attempting to delete klientas with ID {Id}.", id);
+            if (klientas == null || string.IsNullOrWhiteSpace(klientas.Vardas) || string.IsNullOrWhiteSpace(klientas.Pavarde))
+            {
+                return BadRequest("Klientas must have both a first name (Vardas) and last name (Pavarde).");
+            }
+
             try
             {
-                var klientas = _klientasRepository.GetKlientasById(id);
-                if (klientas == null)
+                _logger.LogInformation($"Updating klientas with name: {Vardas}");
+
+                var existingKlientas = await _klientaiCollection
+                    .Find(k => k.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
+                if (existingKlientas == null)
                 {
-                    Log.Warning("Klientas with ID {Id} not found.", id);
-                    return NotFound($"Klientas su ID {id} nerastas.");
+                    _logger.LogWarning($"Klientas with name '{Vardas}' not found.");
+                    return NotFound($"Klientas with name '{Vardas}' not found.");
                 }
 
-                _klientasRepository.RemoveKlientasById(id);
-                Log.Information("Klientas with ID {Id} deleted successfully.", id);
+                klientas.Vardas = Vardas;  // Ensure the first name stays the same
+                await _klientaiCollection.ReplaceOneAsync(k => k.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase), klientas);
+
+                _logger.LogInformation($"Successfully updated klientas with name: {Vardas}");
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error deleting klientas with ID {Id}.", id);
-                return StatusCode(500, $"Klaida: {ex.Message}");
+                _logger.LogError($"Error occurred while updating klientas: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        // DELETE: api/Klientas/name/{Vardas}
+        [HttpDelete("name/{Vardas}")]
+        public async Task<IActionResult> Delete(string Vardas)
+        {
+            try
+            {
+                _logger.LogInformation($"Deleting klientas with name: {Vardas}");
+
+                var klientas = await _klientaiCollection
+                    .Find(k => k.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
+                if (klientas == null)
+                {
+                    _logger.LogWarning($"Klientas with name '{Vardas}' not found.");
+                    return NotFound($"Klientas with name '{Vardas}' not found.");
+                }
+
+                await _klientaiCollection.DeleteOneAsync(k => k.Vardas.Equals(Vardas, StringComparison.OrdinalIgnoreCase));
+
+                _logger.LogInformation($"Successfully deleted klientas with name: {Vardas}");
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error occurred while deleting klientas: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
     }

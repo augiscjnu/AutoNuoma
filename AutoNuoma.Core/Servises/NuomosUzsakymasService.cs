@@ -1,65 +1,54 @@
-﻿using AutoNuoma.Core.Models;
-using AutoNuoma.Core.Repo;
+﻿using AutoNuoma.Core.Contracts;
+using AutoNuoma.Core.Models;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace AutoNuoma.Core.Services
 {
     public class NuomosUzsakymasService
     {
-        private readonly NuomosUzsakymasRepository _nuomosUzsakymasRepository;
+        private readonly INuomosUzsakymasRepository _nuomosUzsakymasRepository;
 
-        // Konstruktorius, kuriame injekuojame repository
-        public NuomosUzsakymasService(NuomosUzsakymasRepository nuomosUzsakymasRepository)
+        // Konstruktorinis injektavimas
+        public NuomosUzsakymasService(INuomosUzsakymasRepository nuomosUzsakymasRepository)
         {
             _nuomosUzsakymasRepository = nuomosUzsakymasRepository;
         }
 
         // Gauti visus nuomos užsakymus
-        public List<NuomosUzsakymas> GetAllNuomosUzsakymai()
+        public async Task<List<NuomosUzkasymas>> GetAllAsync()
         {
-            return _nuomosUzsakymasRepository.GetAllNuomosUzsakymai();
+            return await _nuomosUzsakymasRepository.GetAllAsync();
         }
 
-        // Gauti nuomos užsakymą pagal ID
-        public NuomosUzsakymas GetNuomosUzsakymasById(int id)
+        // Gauti nuomos užsakymą pagal vardą
+        public async Task<NuomosUzkasymas> GetByVardasAsync(string vardas)
         {
-            return _nuomosUzsakymasRepository.GetNuomosUzsakymasById(id);
+            return await _nuomosUzsakymasRepository.GetByVardasAsync(vardas);
         }
 
-        // Pridėti naują nuomos užsakymą
-        public void AddNuomosUzsakymas(NuomosUzsakymas nuomosUzsakymas)
+        // Gauti nuomos užsakymą pagal automobilio pavadinimą
+        public async Task<NuomosUzkasymas> GetByPavadinimasAsync(string pavadinimas)
         {
-            _nuomosUzsakymasRepository.AddNuomosUzsakymas(nuomosUzsakymas);
+            return await _nuomosUzsakymasRepository.GetByPavadinimasAsync(pavadinimas);
         }
 
-        // Atnaujinti nuomos užsakymą
-        public void UpdateNuomosUzsakymas(NuomosUzsakymas nuomosUzsakymas)
+        // Sukurti naują nuomos užsakymą
+        public async Task CreateAsync(NuomosUzkasymas nuomosUzkasymas)
         {
-            _nuomosUzsakymasRepository.UpdateNuomosUzsakymas(nuomosUzsakymas);
+            await _nuomosUzsakymasRepository.CreateAsync(nuomosUzkasymas);
         }
 
-        // Ištrinti nuomos užsakymą pagal ID
-        public void DeleteNuomosUzsakymas(int id)
+        // Atnaujinti esamą nuomos užsakymą pagal pavadinimą
+        public async Task UpdateAsync(string pavadinimas, NuomosUzkasymas nuomosUzkasymas)
         {
-            _nuomosUzsakymasRepository.DeleteNuomosUzsakymas(id);
+            await _nuomosUzsakymasRepository.UpdateAsync(pavadinimas, nuomosUzkasymas);
         }
 
-        // Gauti nuomos užsakymus pagal automobilio ID
-        public List<NuomosUzsakymas> GetNuomosUzsakymaiByAutomobilisId(int automobilisId)
+        // Ištrinti nuomos užsakymą pagal pavadinimą
+        public async Task DeleteAsync(string pavadinimas)
         {
-            return _nuomosUzsakymasRepository.GetNuomosUzsakymaiByAutomobilisId(automobilisId);
-        }
-
-        // Gauti nuomos užsakymus pagal kliento ID
-        public List<NuomosUzsakymas> GetNuomosUzsakymaiByKlientasId(int klientasId)
-        {
-            return _nuomosUzsakymasRepository.GetNuomosUzsakymaiByKlientasId(klientasId);
-        }
-
-        // Gauti nuomos užsakymus pagal darbuotojo ID
-        public List<NuomosUzsakymas> GetNuomosUzsakymaiByDarbuotojasId(int darbuotojasId)
-        {
-            return _nuomosUzsakymasRepository.GetNuomosUzsakymaiByDarbuotojasId(darbuotojasId);
+            await _nuomosUzsakymasRepository.DeleteAsync(pavadinimas);
         }
     }
 }

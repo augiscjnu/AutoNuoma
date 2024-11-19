@@ -1,80 +1,51 @@
-﻿using AutoNuoma.Core.Contracts;
+﻿using MongoDB.Driver;
+using AutoNuoma.Core.Contracts;
 using AutoNuoma.Core.Models;
-using Dapper;
-using Microsoft.Data.SqlClient;
-using System;
+using System.Threading.Tasks;
 using System.Collections.Generic;
-using System.Linq;
 
-namespace AutoNuoma.Core.Repo
+namespace AutoNuoma.Core.Repositories
 {
     public class NuomosUzsakymasRepository : INuomosUzsakymasRepository
     {
-        private readonly string _connectionString;
+        private readonly IMongoCollection<NuomosUzkasymas> _nuomosUzkasymasCollection;
 
-        public NuomosUzsakymasRepository(string connectionString)
+        public NuomosUzsakymasRepository(IMongoClient mongoClient)
         {
-            _connectionString = connectionString;
+            var database = mongoClient.GetDatabase("AutoNuomaDb");
+            _nuomosUzkasymasCollection = database.GetCollection<NuomosUzkasymas>("NuomosUzkasymas");
         }
 
-        // Gauti visus nuomos užsakymus
-        public List<NuomosUzsakymas> GetAllNuomosUzsakymai()
+        public async Task<List<NuomosUzkasymas>> GetAllAsync()
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.Query<NuomosUzsakymas>("SELECT * FROM NuomosUzsakymai").ToList();
+            return await _nuomosUzkasymasCollection.Find(_ => true).ToListAsync();
         }
 
-        // Gauti nuomos užsakymą pagal ID
-        public NuomosUzsakymas GetNuomosUzsakymasById(int id)
+        public async Task<NuomosUzkasymas> GetByVardasAsync(string vardas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.QueryFirstOrDefault<NuomosUzsakymas>("SELECT * FROM NuomosUzsakymai WHERE Id = @Id", new { Id = id }); 
+            return await _nuomosUzkasymasCollection.Find(n => n.Vardas == vardas).FirstOrDefaultAsync();
         }
 
-        // Pridėti naują nuomos užsakymą
-        public void AddNuomosUzsakymas(NuomosUzsakymas nuomosUzsakymas)
+        public async Task<NuomosUzkasymas> GetByPavadinimasAsync(string pavadinimas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "INSERT INTO NuomosUzsakymai (AutomobilisId, KlientasId, DarbuotojasId, PradziosData, PabaigosData, Kaina) VALUES (@AutomobilisId, @KlientasId, @DarbuotojasId, @PradziosData, @PabaigosData, @Kaina)";
-            connection.Execute(query, nuomosUzsakymas);
-        }
-        
-
-        // Atnaujinti nuomos užsakymą
-        public void UpdateNuomosUzsakymas(NuomosUzsakymas nuomosUzsakymas)
-        {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "UPDATE NuomosUzsakymai SET AutomobilisId = @AutomobilisId, KlientasId = @KlientasId, DarbuotojasId = @DarbuotojasId, PradziosData = @PradziosData, PabaigosData = @PabaigosData, Kaina = @Kaina WHERE Id = @Id";
-            connection.Execute(query, nuomosUzsakymas); 
+            return await _nuomosUzkasymasCollection.Find(n => n.Pavadinimas == pavadinimas).FirstOrDefaultAsync();
         }
 
-        // Ištrinti nuomos užsakymą pagal ID
-        public void DeleteNuomosUzsakymas(int id)
+        public async Task CreateAsync(NuomosUzkasymas nuomosUzkasymas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "DELETE FROM NuomosUzsakymai WHERE Id = @Id";
-            connection.Execute(query, new { Id = id }); 
+            await _nuomosUzkasymasCollection.InsertOneAsync(nuomosUzkasymas);
         }
 
-        // Gauti nuomos užsakymus pagal automobilio ID
-        public List<NuomosUzsakymas> GetNuomosUzsakymaiByAutomobilisId(int automobilisId)
+        public async Task UpdateAsync(string pavadinimas, NuomosUzkasymas nuomosUzkasymas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.Query<NuomosUzsakymas>("SELECT * FROM NuomosUzsakymai WHERE AutomobilisId = @AutomobilisId", new { AutomobilisId = automobilisId }).ToList(); 
+            var filter = Builders<NuomosUzkasymas>.Filter.Eq(n => n.Pavadinimas, pavadinimas);
+            await _nuomosUzkasymasCollection.ReplaceOneAsync(filter, nuomosUzkasymas);
         }
 
-        // Gauti nuomos užsakymus pagal kliento ID
-        public List<NuomosUzsakymas> GetNuomosUzsakymaiByKlientasId(int klientasId)
+        public async Task DeleteAsync(string pavadinimas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.Query<NuomosUzsakymas>("SELECT * FROM NuomosUzsakymai WHERE KlientasId = @KlientasId", new { KlientasId = klientasId }).ToList(); 
-        }
-
-        // Gauti nuomos užsakymus pagal darbuotojo ID
-        public List<NuomosUzsakymas> GetNuomosUzsakymaiByDarbuotojasId(int darbuotojasId)
-        {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.Query<NuomosUzsakymas>("SELECT * FROM NuomosUzsakymai WHERE DarbuotojasId = @DarbuotojasId", new { DarbuotojasId = darbuotojasId }).ToList(); 
+            var filter = Builders<NuomosUzkasymas>.Filter.Eq(n => n.Pavadinimas, pavadinimas);
+            await _nuomosUzkasymasCollection.DeleteOneAsync(filter);
         }
     }
 }

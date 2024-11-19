@@ -1,135 +1,174 @@
-﻿using AutoNuoma.Core.Contracts;
-using AutoNuoma.Core.Models;
+﻿using AutoNuoma.Core.Models;
 using Microsoft.AspNetCore.Mvc;
-using Serilog;
+using Microsoft.Extensions.Logging; // Add this namespace
+using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace AutoNuomaWeb.Controllers
+namespace AutoNuoma.API.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
+    [ApiController]
     public class AutomobiliaiController : ControllerBase
     {
-        private readonly IAutomobilisRepository _automobilisRepository;
+        private readonly IMongoCollection<Automobilis> _automobiliaiCollection;
+        private readonly ILogger<AutomobiliaiController> _logger;  // Declare logger
 
-        // Inject Serilog into the controller
-        public AutomobiliaiController(IAutomobilisRepository automobilisRepository)
+        // Inject ILogger into the constructor
+        public AutomobiliaiController(IMongoClient mongoClient, ILogger<AutomobiliaiController> logger)
         {
-            _automobilisRepository = automobilisRepository;
+            // MongoDB collection setup
+            var database = mongoClient.GetDatabase("AutoNuomaDb");
+            _automobiliaiCollection = database.GetCollection<Automobilis>("Automobiliai");
+
+            // Assign the logger
+            _logger = logger;
         }
 
-        // GET api/automobiliai
+        // GET: api/Automobiliai
         [HttpGet]
-        public IActionResult GetAllAutomobiliai()
+        public async Task<ActionResult<List<Automobilis>>> Get()
         {
-            Log.Information("Fetching all automobiliai.");
             try
             {
-                var automobiliai = _automobilisRepository.GetAllAutomobiliai();
-                Log.Information("{Count} automobiliai fetched successfully.", automobiliai.Count);
+                _logger.LogInformation("Fetching all automobiliai from the database.");
+
+                var automobiliai = await _automobiliaiCollection.Find(_ => true).ToListAsync();
+
+                _logger.LogInformation($"Successfully fetched {automobiliai.Count} automobiliai.");
                 return Ok(automobiliai);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error fetching automobiliai.");
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while fetching automobiliai: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // GET api/automobiliai/{id}
-        [HttpGet("{id}")]
-        public IActionResult GetAutomobilis(int id)
+        // GET: api/Automobiliai/name/{Pavadinimas}
+        // GET: api/Automobiliai/name/{Pavadinimas}
+        [HttpGet("name/{Pavadinimas}")]
+        public async Task<ActionResult<Automobilis>> GetByName(string Pavadinimas)
         {
-            Log.Information("Fetching automobilis with ID {Id}.", id);
             try
             {
-                var automobilis = _automobilisRepository.GetAutomobilisById(id);
+                _logger.LogInformation($"Searching for automobilis with name: {Pavadinimas}");
+
+                var automobilis = await _automobiliaiCollection
+                    .Find(a => a.Pavadinimas.Equals(Pavadinimas, StringComparison.OrdinalIgnoreCase)) // Case-insensitive search
+                    .FirstOrDefaultAsync();
+
                 if (automobilis == null)
                 {
-                    Log.Warning("Automobilis with ID {Id} not found.", id);
-                    return NotFound();
+                    _logger.LogWarning($"Automobilis with name '{Pavadinimas}' not found.");
+                    return NotFound($"Automobilis su pavadinimu '{Pavadinimas}' nerastas.");
                 }
-                Log.Information("Automobilis with ID {Id} fetched successfully.", id);
+
+                _logger.LogInformation($"Automobilis with name '{Pavadinimas}' found.");
                 return Ok(automobilis);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error fetching automobilis with ID {Id}.", id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while searching for automobilis by name '{Pavadinimas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // POST api/automobiliai
+
+        // POST: api/Automobiliai
         [HttpPost]
-        public IActionResult AddAutomobilis([FromBody] Automobilis automobilis)
+        public async Task<ActionResult<Automobilis>> Post([FromBody] Automobilis automobilis)
         {
-            Log.Information("Attempting to add a new automobilis with ID {Id}.", automobilis.Id);
+            if (string.IsNullOrWhiteSpace(automobilis.Pavadinimas))
+            {
+                return BadRequest("Automobilis privalo turėti pavadinimą.");
+            }
+
             try
             {
-                _automobilisRepository.AddAutomobilis(automobilis);
-                Log.Information("Automobilis with ID {Id} added successfully.", automobilis.Id);
-                return CreatedAtAction(nameof(GetAutomobilis), new { id = automobilis.Id }, automobilis);
+                _logger.LogInformation("Inserting a new automobilis into the database.");
+
+                await _automobiliaiCollection.InsertOneAsync(automobilis);
+
+                _logger.LogInformation($"Successfully inserted automobilis with name: {automobilis.Pavadinimas}");
+
+                return CreatedAtAction(nameof(GetByName), new { Pavadinimas = automobilis.Pavadinimas }, automobilis);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error adding automobilis with ID {Id}.", automobilis.Id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while inserting automobilis: {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // PUT api/automobiliai/{id}
-        [HttpPut("{id}")]
-        public IActionResult UpdateAutomobilis(int id, [FromBody] Automobilis automobilis)
+        // PUT: api/Automobiliai/name/{Pavadinimas}
+        [HttpPut("name/{Pavadinimas}")]
+        public async Task<IActionResult> Put(string Pavadinimas, [FromBody] Automobilis automobilis)
         {
-            automobilis.Id = id;
-            Log.Information("Attempting to update automobilis with ID {Id}.", id);
+            if (automobilis == null || string.IsNullOrWhiteSpace(automobilis.Pavadinimas))
+            {
+                return BadRequest("Automobilis turi turėti pavadinimą.");
+            }
+
             try
             {
-                _automobilisRepository.UpdateAutomobilis(automobilis);
-                Log.Information("Automobilis with ID {Id} updated successfully.", id);
+                _logger.LogInformation($"Updating automobilis with name: {Pavadinimas}");
+
+                var existingAutomobilis = await _automobiliaiCollection
+                    .Find(a => a.Pavadinimas.Equals(Pavadinimas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
+                if (existingAutomobilis == null)
+                {
+                    _logger.LogWarning($"Automobilis with name '{Pavadinimas}' not found.");
+                    return NotFound("Automobilis nerastas.");
+                }
+
+                automobilis.Pavadinimas = Pavadinimas;  // Ensure the name stays the same
+
+                await _automobiliaiCollection.ReplaceOneAsync(a => a.Pavadinimas.Equals(Pavadinimas, StringComparison.OrdinalIgnoreCase), automobilis);
+
+                _logger.LogInformation($"Successfully updated automobilis with name: {Pavadinimas}");
+
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error updating automobilis with ID {Id}.", id);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while updating automobilis with name '{Pavadinimas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
-        // DELETE api/automobiliai/{id}
-        [HttpDelete("{id}")]
-        public IActionResult DeleteAutomobilis(int id)
+        // DELETE: api/Automobiliai/name/{Pavadinimas}
+        [HttpDelete("name/{Pavadinimas}")]
+        public async Task<IActionResult> Delete(string Pavadinimas)
         {
-            Log.Information("Attempting to delete automobilis with ID {Id}.", id);
             try
             {
-                _automobilisRepository.DeleteAutomobilis(id);
-                Log.Information("Automobilis with ID {Id} deleted successfully.", id);
+                _logger.LogInformation($"Deleting automobilis with name: {Pavadinimas}");
+
+                var automobilis = await _automobiliaiCollection
+                    .Find(a => a.Pavadinimas.Equals(Pavadinimas, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefaultAsync();
+
+                if (automobilis == null)
+                {
+                    _logger.LogWarning($"Automobilis with name '{Pavadinimas}' not found.");
+                    return NotFound("Automobilis nerastas.");
+                }
+
+                await _automobiliaiCollection.DeleteOneAsync(a => a.Pavadinimas.Equals(Pavadinimas, StringComparison.OrdinalIgnoreCase));
+
+                _logger.LogInformation($"Successfully deleted automobilis with name: {Pavadinimas}");
+
                 return NoContent();
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error deleting automobilis with ID {Id}.", id);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-        // GET api/automobiliai/laisvi
-        [HttpGet("laisvi")]
-        public IActionResult GetLaisviAutomobiliai(DateTime pradziosData, DateTime pabaigosData)
-        {
-            Log.Information("Fetching available automobiliai for the period {PradziosData} - {PabaigosData}.", pradziosData, pabaigosData);
-            try
-            {
-                var automobiliai = _automobilisRepository.GetLaisviAutomobiliai(pradziosData, pabaigosData);
-                Log.Information("{Count} available automobiliai fetched for the period {PradziosData} - {PabaigosData}.", automobiliai.Count, pradziosData, pabaigosData);
-                return Ok(automobiliai);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error fetching available automobiliai for the period {PradziosData} - {PabaigosData}.", pradziosData, pabaigosData);
-                return StatusCode(500, "Internal server error");
+                _logger.LogError($"Error occurred while deleting automobilis with name '{Pavadinimas}': {ex.Message}");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
     }

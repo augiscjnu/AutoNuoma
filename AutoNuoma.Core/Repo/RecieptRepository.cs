@@ -2,9 +2,9 @@
 using System.IO;
 using AutoNuoma.Core.Models;
 using AutoNuoma.Core.Contracts;
+using AutoNuoma.Core.Repositories;
 
-namespace AutoNuoma.Core.Repo
-{
+/*{
     public class RecieptRepository : IRecieptRepository
     {
         private readonly string _receiptDirectory;
@@ -18,7 +18,7 @@ namespace AutoNuoma.Core.Repo
         }
 
         // Method to generate a receipt for a rental order
-        public void GenerateReceipt(int uzsakymoId, int automobilisId, DateTime pradziosData, DateTime pabaigosData, decimal bendraKaina)
+        /*public void GenerateReceipt(int uzsakymoId, int automobilisId, DateTime pradziosData, DateTime pabaigosData, decimal bendraKaina)
         {
             // Fetch car details
             var automobilis = _automobilisRepository.GetAutomobilisById(automobilisId);
@@ -58,4 +58,4 @@ namespace AutoNuoma.Core.Repo
             ";
         }
     }
-}
+}*/

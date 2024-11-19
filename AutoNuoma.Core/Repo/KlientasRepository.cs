@@ -1,53 +1,53 @@
 ﻿using AutoNuoma.Core.Contracts;
 using AutoNuoma.Core.Models;
-using Dapper;
-using Microsoft.Data.SqlClient;
-using System;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading.Tasks;
 
-namespace AutoNuoma.Core.Repo
+namespace AutoNuoma.Core.Repositories
 {
     public class KlientasRepository : IKlientasRepository
     {
-        private readonly string _connectionString;
+        private readonly IMongoCollection<Klientas> _klientai;
 
-        public KlientasRepository(string connectionString)
+        // Constructor where MongoDB client is injected
+        public KlientasRepository(IMongoClient mongoClient)
         {
-            _connectionString = connectionString;
+            var database = mongoClient.GetDatabase("AutoNuomaDb");  // Name of the database
+            _klientai = database.GetCollection<Klientas>("Klientai");  // Collection name
         }
 
-       
-
-        // Gauti visus klientus
-        public List<Klientas> GetAllKlientai()
+        // Get all klientai (clients)
+        public async Task<List<Klientas>> GetAllAsync()
         {
-
-            using var connection = new SqlConnection(_connectionString);
-            return connection.Query<Klientas>("SELECT * FROM Klientai1").ToList(); 
+            return await _klientai.Find(k => true).ToListAsync();
         }
 
-        // Gauti klientą pagal ID
-        public Klientas GetKlientasById(int id)
+        // Get a single klientas by ID
+        public async Task<Klientas> GetByIdAsync(ObjectId id)
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.QueryFirstOrDefault<Klientas>("SELECT * FROM Klientai1 WHERE Id = @Id", new { Id = id }); 
+            return await _klientai.Find(k => k.Id == id).FirstOrDefaultAsync();
         }
 
-        // Pridėti naują klientą
-        public void AddKlientas(Klientas klientas)
+        // Create a new klientas
+        public async Task CreateAsync(Klientas klientas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "INSERT INTO Klientai1 (Vardas, Pavarde, ElPastas, Telefonas) VALUES (@Vardas, @Pavarde, @ElPastas, @Telefonas)";
-            connection.Execute(query, klientas); 
+            await _klientai.InsertOneAsync(klientas);
         }
 
-        // Ištrinti klientą pagal ID
-        public void RemoveKlientasById(int id)
+        // Update an existing klientas by ID
+        public async Task UpdateAsync(ObjectId id, Klientas klientas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "DELETE FROM Klientai1 WHERE Id = @Id";
-            connection.Execute(query, new { Id = id }); 
+            var filter = Builders<Klientas>.Filter.Eq(k => k.Id, id);
+            await _klientai.ReplaceOneAsync(filter, klientas);
+        }
+
+        // Delete a klientas by ID
+        public async Task DeleteAsync(ObjectId id)
+        {
+            var filter = Builders<Klientas>.Filter.Eq(k => k.Id, id);
+            await _klientai.DeleteOneAsync(filter);
         }
     }
 }

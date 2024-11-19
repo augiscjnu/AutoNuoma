@@ -1,56 +1,53 @@
 ﻿using AutoNuoma.Core.Contracts;
 using AutoNuoma.Core.Models;
-using Dapper;
-using Microsoft.Data.SqlClient;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace AutoNuoma.Core.Repo
+namespace AutoNuoma.Core.Repositories
 {
     public class DarbuotojasRepository : IDarbuotojasRepository
     {
-        private readonly string _connectionString;
+        private readonly IMongoCollection<Darbuotojas> _darbuotojai;
 
-        public DarbuotojasRepository(string connectionString)
+        // Constructor where MongoDB client is injected
+        public DarbuotojasRepository(IMongoClient mongoClient)
         {
-            _connectionString = connectionString;
+            var database = mongoClient.GetDatabase("AutoNuomaDb");  // Name of the database
+            _darbuotojai = database.GetCollection<Darbuotojas>("Darbuotojai");  // Collection name
         }
 
-        // Gauti visus darbuotojus
-        public List<Darbuotojas> GetAllDarbuotojai()
+        // Get all darbuotojai (employees)
+        public async Task<List<Darbuotojas>> GetAllAsync()
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.Query<Darbuotojas>("SELECT * FROM Darbuotojai").ToList();
+            return await _darbuotojai.Find(d => true).ToListAsync();
         }
 
-        // Gauti darbuotoją pagal ID
-        public Darbuotojas GetDarbuotojasById(int id)
+        // Get a single darbuotojas by ID
+        public async Task<Darbuotojas> GetByIdAsync(ObjectId id)
         {
-            using var connection = new SqlConnection(_connectionString);
-            return connection.QueryFirstOrDefault<Darbuotojas>("SELECT * FROM Darbuotojai WHERE Id = @Id", new { Id = id });
+            return await _darbuotojai.Find(d => d.Id == id).FirstOrDefaultAsync();
         }
 
-        // Pridėti naują darbuotoją
-        public void AddDarbuotojas(Darbuotojas darbuotojas)
+        // Create a new darbuotojas
+        public async Task CreateAsync(Darbuotojas darbuotojas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "INSERT INTO Darbuotojai (Vardas, Pavarde, Pareigos) VALUES (@Vardas, @Pavarde, @Pareigos)";
-            connection.Execute(query, darbuotojas);
+            await _darbuotojai.InsertOneAsync(darbuotojas);
         }
 
-        // Atnaujinti darbuotoją
-        public void UpdateDarbuotojas(Darbuotojas darbuotojas)
+        // Update an existing darbuotojas by ID
+        public async Task UpdateAsync(ObjectId id, Darbuotojas darbuotojas)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "UPDATE Darbuotojai SET Vardas = @Vardas, Pavarde = @Pavarde, Pareigos = @Pareigos WHERE Id = @Id";
-            connection.Execute(query, darbuotojas);
+            var filter = Builders<Darbuotojas>.Filter.Eq(d => d.Id, id);
+            await _darbuotojai.ReplaceOneAsync(filter, darbuotojas);
         }
 
-        // Ištrinti darbuotoją pagal ID
-        public void RemoveDarbuotojasById(int id)
+        // Delete a darbuotojas by ID
+        public async Task DeleteAsync(ObjectId id)
         {
-            using var connection = new SqlConnection(_connectionString);
-            var query = "DELETE FROM Darbuotojai WHERE Id = @Id";
-            connection.Execute(query, new { Id = id });
+            var filter = Builders<Darbuotojas>.Filter.Eq(d => d.Id, id);
+            await _darbuotojai.DeleteOneAsync(filter);
         }
     }
 }

@@ -4,7 +4,7 @@ using System;
 
 namespace AutoNuoma.Core.Services
 {
-    public class RentalService
+   /* public class RentalService
     {
         private readonly INuomosUzsakymasRepository _nuomosUzsakymasRepository;
         private readonly IAutomobilisRepository _automobilisRepository;
@@ -45,5 +45,5 @@ namespace AutoNuoma.Core.Services
             // Generate a receipt
             _recieptRepository.GenerateReceipt(uzsakymas.Id, automobilisId, pradziosData, pabaigosData, bendraKaina);
         }
-    }
+    }*/
 }

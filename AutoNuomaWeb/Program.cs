@@ -3,27 +3,29 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using AutoNuoma.Core.Contracts;
-using AutoNuoma.Core.Repo;
+
 using Serilog;
 using AutoNuoma.Core.Services;
+using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 
-builder.Services.AddTransient<IAutomobilisRepository>(x => new AutomobilisRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
+builder.Services.AddSingleton<IMongoClient, MongoClient>(sp => new MongoClient(builder.Configuration.GetConnectionString("MongoDb")));
 
-builder.Services.AddTransient<IKlientasRepository>(x => new KlientasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
+//builder.Services.AddSingleton<AutomobilisService>();
+//builder.Services.AddTransient<IKlientasRepository>(x => new KlientasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
 
-builder.Services.AddTransient<IDarbuotojasRepository>(x => new DarbuotojasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
+//builder.Services.AddTransient<IDarbuotojasRepository>(x => new DarbuotojasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
-builder.Services.AddTransient<INuomosUzsakymasRepository>(x => new NuomosUzsakymasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
+//builder.Services.AddTransient<INuomosUzsakymasRepository>(x => new NuomosUzsakymasRepository("Server=localhost;Database=C#mokymai;Trusted_Connection=True;TrustServerCertificate=true;"));
 
-builder.Services.AddTransient<DataBackupService>();
+//builder.Services.AddTransient<DataBackupService>();
 
-builder.Services.AddSingleton<IRecieptRepository>(provider => new RecieptRepository("C:\\path\\to\\receipts", provider.GetRequiredService<IAutomobilisRepository>()));
-builder.Services.AddSingleton<RentalService>();
+//builder.Services.AddSingleton<IRecieptRepository>(provider => new RecieptRepository("C:\\path\\to\\receipts", provider.GetRequiredService<IAutomobilisRepository>()));
+//builder.Services.AddSingleton<RentalService>();
 
 builder.Services.AddControllers();
 

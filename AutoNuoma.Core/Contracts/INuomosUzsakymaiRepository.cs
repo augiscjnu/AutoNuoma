@@ -1,25 +1,11 @@
 ﻿using AutoNuoma.Core.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace AutoNuoma.Core.Contracts
+public interface INuomosUzsakymasRepository
 {
-    public interface INuomosUzsakymasRepository
-    {
-        List<NuomosUzsakymas> GetAllNuomosUzsakymai(); 
-        NuomosUzsakymas GetNuomosUzsakymasById(int id); 
-        void AddNuomosUzsakymas(NuomosUzsakymas nuomosUzsakymas); 
-        void UpdateNuomosUzsakymas(NuomosUzsakymas nuomosUzsakymas); 
-        void DeleteNuomosUzsakymas(int id); 
-        List<NuomosUzsakymas> GetNuomosUzsakymaiByAutomobilisId(int automobilisId); 
-        List<NuomosUzsakymas> GetNuomosUzsakymaiByKlientasId(int klientasId); 
-        List<NuomosUzsakymas> GetNuomosUzsakymaiByDarbuotojasId(int darbuotojasId);
-    }
+    Task<List<NuomosUzkasymas>> GetAllAsync();
+    Task<NuomosUzkasymas> GetByVardasAsync(string vardas);  // Pakeista pagal naują lauką
+    Task<NuomosUzkasymas> GetByPavadinimasAsync(string pavadinimas);  // Pakeista pagal naują lauką
+    Task CreateAsync(NuomosUzkasymas nuomosUzkasymas);
+    Task UpdateAsync(string pavadinimas, NuomosUzkasymas nuomosUzkasymas);  // Pakeista pagal Pavadinimą
+    Task DeleteAsync(string pavadinimas);  // Pakeista pagal Pavadinimą
 }
-
-
-
-

@@ -1,42 +1,39 @@
-﻿using AutoNuoma.Core.Contracts;
-using AutoNuoma.Core.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using AutoNuoma.Core.Models;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
-namespace AutoNuoma.Core.Services
+public class AutomobilisService
 {
-    public class AutomobiliaiService
+    private readonly IMongoCollection<Automobilis> _automobiliaiCollection;
+
+    // Konstruktoras, priimantis IMongoDatabase kaip parametrą
+    public AutomobilisService(IMongoDatabase database)
     {
-        private readonly IAutomobilisRepository _automobilisRepository;
+        _automobiliaiCollection = database.GetCollection<Automobilis>("Automobiliai");
+    }
 
-        public AutomobiliaiService(IAutomobilisRepository automobilisRepository)
-        {
-            _automobilisRepository = automobilisRepository;
-        }
+    public async Task<List<Automobilis>> GetAllAutomobiliaiAsync()
+    {
+        return await _automobiliaiCollection.Find(_ => true).ToListAsync();
+    }
 
-        public async Task<List<Automobilis>> GetAllAutomobiliaiAsync()
-        {
-            return await _automobilisRepository.GetAllAutomobiliaiAsync();
-        }
+    public async Task<Automobilis> GetAutomobilisByIdAsync(ObjectId id)
+    {
+        return await _automobiliaiCollection.Find(a => a.Id == id).FirstOrDefaultAsync();
+    }
 
-        public async Task<Automobilis> GetAutomobilisByIdAsync(int id)
-        {
-            return await _automobilisRepository.GetAutomobilisByIdAsync(id);
-        }
+    public async Task CreateAutomobilisAsync(Automobilis automobilis)
+    {
+        await _automobiliaiCollection.InsertOneAsync(automobilis);
+    }
 
-        public async Task AddAutomobilisAsync(Automobilis automobilis)
-        {
-            await _automobilisRepository.AddAutomobilisAsync(automobilis);
-        }
+    public async Task UpdateAutomobilisAsync(ObjectId id, Automobilis automobilis)
+    {
+        await _automobiliaiCollection.ReplaceOneAsync(a => a.Id == id, automobilis);
+    }
 
-        public async Task UpdateAutomobilisAsync(Automobilis automobilis)
-        {
-            await _automobilisRepository.UpdateAutomobilisAsync(automobilis);
-        }
-
-        public async Task DeleteAutomobilisAsync(int id)
-        {
-            await _automobilisRepository.DeleteAutomobilisAsync(id);
-        }
+    public async Task DeleteAutomobilisAsync(ObjectId id)
+    {
+        await _automobiliaiCollection.DeleteOneAsync(a => a.Id == id);
     }
 }

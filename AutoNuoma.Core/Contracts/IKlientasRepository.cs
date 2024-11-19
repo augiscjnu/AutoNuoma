@@ -1,18 +1,16 @@
 ﻿using AutoNuoma.Core.Models;
-using System;
+using MongoDB.Bson;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AutoNuoma.Core.Contracts
 {
     public interface IKlientasRepository
     {
-        List<Klientas> GetAllKlientai();             // Sinchroninis metodas, grąžinantis visus klientus
-        Klientas GetKlientasById(int id);            // Sinchroninis metodas, grąžinantis klientą pagal ID
-        void AddKlientas(Klientas klientas);         // Sinchroninis metodas klientui pridėti
-        void RemoveKlientasById(int id);             // Sinchroninis metodas klientui ištrinti pagal ID
+        Task<List<Klientas>> GetAllAsync();
+        Task<Klientas> GetByIdAsync(ObjectId id);
+        Task CreateAsync(Klientas klientas);
+        Task UpdateAsync(ObjectId id, Klientas klientas);
+        Task DeleteAsync(ObjectId id);
     }
 }
-

@@ -1,16 +1,16 @@
 ﻿using AutoNuoma.Core.Models;
-using System;
+using MongoDB.Bson;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace AutoNuoma.Core.Contracts
+namespace AutoNuoma.Core.Repositories
 {
     public interface IAutomobilisRepository
     {
-        List<Automobilis> GetAllAutomobiliai(); 
-        Automobilis GetAutomobilisById(int id); 
-        void AddAutomobilis(Automobilis automobilis);
-        void UpdateAutomobilis(Automobilis automobilis); 
-        void DeleteAutomobilis(int id); 
-        List<Automobilis> GetLaisviAutomobiliai(DateTime pradziosData, DateTime pabaigosData); 
+        Task<Automobilis> GetByIdAsync(ObjectId id);
+        Task<List<Automobilis>> GetAllAsync();
+        Task CreateAsync(Automobilis automobilis);
+        Task UpdateAsync(ObjectId id, Automobilis automobilis);
+        Task DeleteAsync(ObjectId id);
     }
 }
